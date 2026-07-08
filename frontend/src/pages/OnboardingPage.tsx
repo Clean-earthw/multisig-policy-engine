@@ -1,8 +1,8 @@
 import { useState, useCallback, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi";
-import { decodeEventLog, parseAbiItem } from "viem";
-import { FLARE_COSTON2_CHAIN, CONTRACTS, PRESET_DESCRIPTIONS, shortAddress, explorerUrl } from "../lib/constants";
+import { decodeEventLog } from "viem";
+import { FLARE_COSTON2_CHAIN, CONTRACTS, PRESET_DESCRIPTIONS } from "../lib/constants";
 import { CopyableAddress } from "../components/CopyableAddress";
 import { WALLET_FACTORY_ABI } from "../lib/abi";
 
@@ -22,19 +22,41 @@ const STEPS: { key: Step; num: number; label: string }[] = [
   { key: "deploying", num: 4, label: "Deploy" },
 ];
 
+// NEW: Preset metadata with descriptions
 const PRESET_META = [
-  { id: 0, name: "Low-Value Transfer", icon: "\uD83D\uDCB5", riskWeight: 2, color: "var(--green)" },
-  { id: 1, name: "High-Value Transfer", icon: "\uD83D\uDCB0", riskWeight: 5, color: "var(--accent)" },
-  { id: 2, name: "Treasury Management", icon: "\uD83D\uDD12", riskWeight: 9, color: "var(--red)" },
-  { id: 3, name: "DeFi Interaction", icon: "\u2699\uFE0F", riskWeight: 6, color: "var(--blue)" },
+  { 
+    id: 0, 
+    name: "Low-Value Transfer", 
+    icon: "💵", 
+    riskWeight: 2, 
+    color: "var(--green)",
+    description: "Auto-approve transfers under $1,000. Low friction for everyday operations. Requires 1 signer."
+  },
+  { 
+    id: 1, 
+    name: "High-Value Transfer", 
+    icon: "💰", 
+    riskWeight: 5, 
+    color: "var(--accent)",
+    description: "High-Value Transfers over $1,000 USDC. Requires multi-sig approval with 2 signers and medium risk checks."
+  },
+  { 
+    id: 2, 
+    name: "Treasury Management", 
+    icon: "🔒", 
+    riskWeight: 9, 
+    color: "var(--red)",
+    description: "Very High Value transfers over $50K. Requires verified contracts and 3 signers for admin-level approval."
+  },
+  { 
+    id: 3, 
+    name: "DeFi Interaction", 
+    icon: "⚙️", 
+    riskWeight: 6, 
+    color: "var(--blue)",
+    description: "Interact with whitelisted DeFi protocols. Moderate limits with balanced security requiring 2 signers."
+  },
 ];
-
-const PRESET_NAMES: Record<number, string> = {
-  0: "Low-Value Transfer",
-  1: "High-Value Transfer",
-  2: "Treasury Management",
-  3: "DeFi Interaction",
-};
 
 export default function OnboardingPage() {
   const { address, isConnected } = useAccount();
@@ -66,17 +88,11 @@ export default function OnboardingPage() {
     });
   }, []);
 
-  const handleAddSignerInput = () => {
-    const addr = newSigner.trim() as `0x${string}`;
-    addSigner(addr);
-    setNewSigner("");
-  };
-
   if (!isConnected) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <div className="card max-w-md text-center">
-          <div className="text-4xl mb-4">&#x1F512;</div>
+          <div className="text-4xl mb-4">🔒</div>
           <h2 className="text-xl font-bold mb-2">Connect Your Wallet</h2>
           <p className="text-sm text-[var(--text-secondary)]">
             Connect your wallet to create a new multisig with preset policies.
@@ -121,7 +137,11 @@ export default function OnboardingPage() {
           signers={signers}
           newSigner={newSigner}
           setNewSigner={setNewSigner}
-          onAddSigner={handleAddSignerInput}
+          onAddSigner={() => {
+            const addr = newSigner.trim() as `0x${string}`;
+            addSigner(addr);
+            setNewSigner("");
+          }}
           onRemoveSigner={removeSigner}
           onAddSelf={() => address && addSigner(address)}
           connectedAddress={address}
@@ -162,7 +182,7 @@ function StepIndicator({ steps, currentStep }: { steps: typeof STEPS; currentSte
                   : "bg-[var(--bg-card)] text-[var(--text-secondary)]"
             }`}
           >
-            {num < currentStep ? "\u2713" : num}
+            {num < currentStep ? "✓" : num}
           </div>
           <span
             className={`text-sm hidden sm:inline ${
@@ -197,8 +217,6 @@ function SignersStep({
   connectedAddress?: `0x${string}`;
   onNext: () => void;
 }) {
-  const showAddSelf = connectedAddress && !signers.includes(connectedAddress);
-
   return (
     <div className="card">
       <h3 className="text-lg font-semibold mb-1">Add Signers</h3>
@@ -219,12 +237,12 @@ function SignersStep({
         </button>
       </div>
 
-      {showAddSelf && (
+      {connectedAddress && !signers.includes(connectedAddress) && (
         <button
           onClick={onAddSelf}
           className="text-xs text-[var(--accent)] hover:underline mb-3 block"
         >
-          + Add your connected wallet (<CopyableAddress address={connectedAddress!} />)
+          + Add your connected wallet
         </button>
       )}
 
@@ -250,7 +268,7 @@ function SignersStep({
                 onClick={() => onRemoveSigner(s)}
                 className="text-[var(--red)] text-lg px-2 hover:opacity-80"
               >
-                &times;
+                ×
               </button>
             </div>
           ))}
@@ -266,7 +284,7 @@ function SignersStep({
           disabled={signers.length < 1}
           className="btn btn-primary"
         >
-          Continue to Policies
+          Continue to Policies →
         </button>
       </div>
     </div>
@@ -316,11 +334,11 @@ function PoliciesStep({
                       : "border-[var(--border)]"
                   }`}
                 >
-                  {selected ? "\u2713" : ""}
+                  {selected ? "✓" : ""}
                 </div>
               </div>
               <p className="text-xs text-[var(--text-secondary)] mb-2">
-                {PRESET_DESCRIPTIONS[preset.id]}
+                {preset.description}
               </p>
               <div className="flex items-center gap-2">
                 <span className="text-xs" style={{ color: preset.color }}>
@@ -369,19 +387,38 @@ function ReviewStep({
 
         <div>
           <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">
+            Signers ({signers.length})
+          </h4>
+          <div className="space-y-1.5">
+            {signers.map((s, i) => (
+              <div key={s} className="flex items-center gap-2 text-sm">
+                <span className="text-[var(--text-secondary)]">#{i + 1}</span>
+                <CopyableAddress address={s} />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="h-px bg-[var(--border)]" />
+
+        <div>
+          <h4 className="text-sm font-medium text-[var(--text-secondary)] mb-2">
             Preset Policies ({selectedPresets.size})
           </h4>
           <div className="space-y-2">
             {Array.from(selectedPresets)
               .sort()
-              .map((id) => (
-                <div key={id} className="flex items-center gap-2 text-sm">
-                  <span className="badge badge-green">{PRESET_NAMES[id]}</span>
-                  <span className="text-[var(--text-secondary)] text-xs">
-                    {PRESET_DESCRIPTIONS[id]}
-                  </span>
-                </div>
-              ))}
+              .map((id) => {
+                const preset = PRESET_META.find(p => p.id === id);
+                return (
+                  <div key={id} className="flex items-center gap-2 text-sm">
+                    <span className="badge badge-green">{preset?.name}</span>
+                    <span className="text-[var(--text-secondary)] text-xs">
+                      {preset?.description.substring(0, 60)}...
+                    </span>
+                  </div>
+                );
+              })}
             {selectedPresets.size === 0 && (
               <p className="text-sm text-[var(--text-secondary)]">No preset policies selected.</p>
             )}
@@ -397,7 +434,7 @@ function ReviewStep({
           <div className="space-y-1.5 text-sm">
             <DeployLine color="var(--green)" label="GovernanceMultisig (unanimous consent)" />
             <DeployLine color="var(--green)" label="PolicyRegistry (governed by multisig)" />
-            <DeployLine color="var(--green)" label="AuditLog" />
+            <DeployLine color="var(--green)" label="AuditLog (append-only)" />
             <DeployLine color="var(--green)" label="MultisigWallet (minimal proxy clone)" />
             {selectedPresets.size > 0 && (
               <DeployLine
@@ -444,69 +481,28 @@ function DeployStep({
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ 
     hash: txHash 
   });
-  const [receipt, setReceipt] = useState<Awaited<ReturnType<NonNullable<typeof publicClient>['getTransactionReceipt']>> | null>(null);
+  const [receipt, setReceipt] = useState<any>(null);
 
   const presetIds = Array.from(selectedPresets).sort().map(BigInt);
 
-  // Fetch full receipt with logs when transaction succeeds
+  // NEW: Fetch and parse receipt when transaction succeeds
   useEffect(() => {
     if (isSuccess && txHash && publicClient && !receipt) {
-      console.log("Fetching full transaction receipt for:", txHash);
-      
       publicClient.getTransactionReceipt({ hash: txHash }).then((fullReceipt) => {
-        console.log("Full receipt:", fullReceipt);
-        
-        // If receipt has no logs, fetch them separately
-        if (!fullReceipt.logs || fullReceipt.logs.length === 0) {
-          console.log("Receipt has no logs, fetching via getLogs...");
-          
-          publicClient.getLogs({
-            address: CONTRACTS.walletFactory,
-            fromBlock: fullReceipt.blockNumber,
-            toBlock: fullReceipt.blockNumber,
-          }).then((logs) => {
-            console.log("Logs from getLogs:", logs);
-            
-            // Filter logs for this transaction
-            const txLogs = logs.filter(log => 
-              log.transactionHash.toLowerCase() === txHash.toLowerCase()
-            );
-            
-            // Merge into receipt
-            (fullReceipt as typeof fullReceipt & { logs: typeof logs }).logs = txLogs;
-            setReceipt(fullReceipt);
-          }).catch((err) => {
-            console.error("Failed to fetch logs:", err);
-            setReceipt(fullReceipt);
-          });
-        } else {
-          setReceipt(fullReceipt);
-        }
-      }).catch((err) => {
-        console.error("Failed to fetch receipt:", err);
-      });
+        setReceipt(fullReceipt);
+      }).catch(console.error);
     }
   }, [isSuccess, txHash, publicClient, receipt]);
 
-  // Parse event logs when we have the full receipt
+  // NEW: Parse WalletCreated event from logs
   useEffect(() => {
     if (receipt && publicClient) {
-      console.log("Processing receipt with logs:", receipt.logs?.length || 0);
-      
-      if (!receipt.logs || receipt.logs.length === 0) {
-        console.warn("No logs in receipt");
-        return;
-      }
-      
-      // Find WalletCreated event by trying to decode all logs from WalletFactory
-      for (const log of receipt.logs) {
-        // Only check logs from WalletFactory contract
+      for (const log of receipt.logs || []) {
         if (log.address.toLowerCase() !== CONTRACTS.walletFactory.toLowerCase()) {
           continue;
         }
         
         try {
-          // Try to decode as WalletCreated event
           const decoded = decodeEventLog({
             abi: WALLET_FACTORY_ABI,
             eventName: "WalletCreated",
@@ -514,17 +510,13 @@ function DeployStep({
             topics: log.topics,
           });
 
-          // Extract addresses from decoded args
           const args = decoded.args as unknown as {
             creator: `0x${string}`;
             wallet: `0x${string}`;
             governance: `0x${string}`;
             policyRegistry: `0x${string}`;
             auditLog: `0x${string}`;
-            signers: `0x${string}`[];
           };
-
-          console.log("Found WalletCreated event with wallet:", args.wallet);
 
           onDone({
             wallet: args.wallet,
@@ -532,14 +524,11 @@ function DeployStep({
             policyRegistry: args.policyRegistry,
             auditLog: args.auditLog,
           });
-          return; // Exit after finding the event
+          return;
         } catch {
-          // Not the WalletCreated event, continue to next log
           continue;
         }
       }
-      
-      console.error("WalletCreated event not found in logs");
     }
   }, [receipt, publicClient, onDone]);
 
@@ -547,7 +536,7 @@ function DeployStep({
     return (
       <div className="max-w-md mx-auto">
         <div className="card text-center py-8">
-          <div className="text-4xl mb-4">&#x2705;</div>
+          <div className="text-4xl mb-4">✅</div>
           <h3 className="text-xl font-bold text-[var(--green)] mb-2">Wallet Deployed!</h3>
           <p className="text-sm text-[var(--text-secondary)] mb-4">
             Your multisig wallet has been created with all contracts and policies in a single transaction.
@@ -559,7 +548,7 @@ function DeployStep({
               rel="noreferrer"
               className="text-sm text-[var(--accent)] hover:underline font-mono"
             >
-              View transaction &rarr;
+              View transaction →
             </a>
           )}
         </div>
@@ -572,7 +561,7 @@ function DeployStep({
       <div className="card text-center py-8">
         {!txHash && (
           <>
-            <div className="text-4xl mb-4">&#x1F680;</div>
+            <div className="text-4xl mb-4">🚀</div>
             <h3 className="text-xl font-bold mb-2">Ready to Deploy</h3>
             <p className="text-sm text-[var(--text-secondary)] mb-6">
               This will deploy governance multisig, policy registry, audit log, and wallet proxy in one transaction.
@@ -585,19 +574,13 @@ function DeployStep({
             )}
             <button
               onClick={() =>
-                writeContract(
-                  {
-                    address: CONTRACTS.walletFactory,
-                    abi: WALLET_FACTORY_ABI,
-                    functionName: "createWallet",
-                    args: [signers, presetIds],
-                    chainId: FLARE_COSTON2_CHAIN.id,
-                  },
-                  {
-                    onSuccess: () => {},
-                    onError: () => {},
-                  },
-                )
+                writeContract({
+                  address: CONTRACTS.walletFactory,
+                  abi: WALLET_FACTORY_ABI,
+                  functionName: "createWallet",
+                  args: [signers, presetIds],
+                  chainId: FLARE_COSTON2_CHAIN.id,
+                })
               }
               className="btn btn-primary"
             >
@@ -608,7 +591,7 @@ function DeployStep({
 
         {txHash && isConfirming && (
           <>
-            <div className="text-4xl mb-4 animate-pulse">&#x26A1;</div>
+            <div className="text-4xl mb-4 animate-pulse">⚡</div>
             <h3 className="text-xl font-bold mb-2">Deploying...</h3>
             <p className="text-sm text-[var(--text-secondary)] mb-4">
               Waiting for confirmation on Flare Coston2.
@@ -627,7 +610,7 @@ function SuccessStep({ deployment }: { deployment: DeploymentResult }) {
   return (
     <div className="max-w-lg mx-auto">
       <div className="card text-center py-8">
-        <div className="text-4xl mb-4">&#x1F389;</div>
+        <div className="text-4xl mb-4">🎉</div>
         <h3 className="text-xl font-bold text-[var(--green)] mb-2">Multisig Wallet Created!</h3>
         <p className="text-sm text-[var(--text-secondary)] mb-6">
           All contracts have been deployed and configured. You're ready to start using your wallet.

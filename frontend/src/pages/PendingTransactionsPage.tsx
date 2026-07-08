@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useReadContracts, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useAccount } from "wagmi";
-import { formatEther, decodeFunctionData, parseUnits, type Address } from "viem";
-import { FLARE_COSTON2_CHAIN, riskColor, riskLabel, decodeCheckResults, CONTRACTS } from "../lib/constants";
+import { useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient, useAccount } from "wagmi";
+import { formatEther, decodeFunctionData, type Address } from "viem";
+import { FLARE_COSTON2_CHAIN, riskColor, riskLabel, decodeCheckResults } from "../lib/constants";
 import { CopyableAddress } from "../components/CopyableAddress";
 import { MULTISIG_WALLET_ABI, ERC20_ABI } from "../lib/abi";
 import { Link } from "react-router-dom";
@@ -31,20 +31,18 @@ export default function PendingTransactionsPage() {
   const publicClient = usePublicClient();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [hasApprovedMap, setHasApprovedMap] = useState<Map<number, boolean>>(new Map());
 
   const { writeContract, data: hash, isPending } = useWriteContract();
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
 
-  // Fetch all transactions
+  // NEW: Fetch all pending transactions
   useEffect(() => {
     if (!selectedMultisig || !publicClient) return;
 
     const fetchTransactions = async () => {
       setLoading(true);
       try {
-        // Get transaction count
         const count = await publicClient.readContract({
           address: selectedMultisig.wallet,
           abi: MULTISIG_WALLET_ABI,
@@ -53,7 +51,6 @@ export default function PendingTransactionsPage() {
 
         const txs: Transaction[] = [];
 
-        // Fetch each transaction
         for (let i = 0; i < Number(count); i++) {
           const result = await publicClient.readContract({
             address: selectedMultisig.wallet,
@@ -69,11 +66,12 @@ export default function PendingTransactionsPage() {
             args: [BigInt(i)],
           });
 
-          if (!result[4]) { // not executed
+          // NEW: Skip executed transactions
+          if (!result[4]) {
             const data = result[1] as `0x${string}`;
             let usdcValue: string | undefined;
             
-            // Try to decode ERC20 transfer data
+            // NEW: Decode ERC20 transfer for display
             if (data && data !== "0x" && data.length >= 138) {
               try {
                 const decoded = decodeFunctionData({
@@ -84,7 +82,7 @@ export default function PendingTransactionsPage() {
                   usdcValue = formatEther(decoded.args[1] as bigint);
                 }
               } catch {
-                // Not an ERC20 transfer, ignore
+                // Not an ERC20 transfer
               }
             }
             
@@ -107,9 +105,9 @@ export default function PendingTransactionsPage() {
           }
         }
 
-        setTransactions(txs.reverse()); // Show newest first
+        setTransactions(txs.reverse());
 
-        // Check which transactions the current user has approved
+        // NEW: Check user approvals
         if (address) {
           const approvedMap = new Map<number, boolean>();
           for (const tx of txs) {
@@ -135,7 +133,6 @@ export default function PendingTransactionsPage() {
 
   const handleApprove = (txId: number) => {
     if (!selectedMultisig) return;
-
     writeContract({
       address: selectedMultisig.wallet,
       abi: MULTISIG_WALLET_ABI,
@@ -146,7 +143,6 @@ export default function PendingTransactionsPage() {
 
   const handleExecute = (txId: number) => {
     if (!selectedMultisig) return;
-
     writeContract({
       address: selectedMultisig.wallet,
       abi: MULTISIG_WALLET_ABI,
@@ -182,14 +178,12 @@ export default function PendingTransactionsPage() {
             {loading ? "Loading..." : `${readyCount} ready for approval, ${pendingCount} awaiting evaluation`}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link to="/transact" className="btn btn-primary">
-            Submit New
-          </Link>
-        </div>
+        <Link to="/transact" className="btn btn-primary">
+          Submit New
+        </Link>
       </div>
 
-      {/* Summary Cards */}
+      {/* NEW: Summary Cards */}
       <div className="grid grid-cols-3 gap-4 mb-6">
         <div className="card">
           <div className="text-sm text-[var(--text-secondary)]">Awaiting Evaluation</div>
@@ -224,10 +218,7 @@ export default function PendingTransactionsPage() {
             const userHasApproved = hasApprovedMap.get(tx.id) || false;
 
             return (
-              <div
-                key={tx.id}
-                className={`card transition-colors ${selectedTx?.id === tx.id ? "border-[var(--accent)]" : ""}`}
-              >
+              <div key={tx.id} className="card">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
@@ -281,6 +272,7 @@ export default function PendingTransactionsPage() {
                       )}
                     </div>
 
+                    {/* NEW: Check results summary */}
                     {tx.evaluated && tx.checkResults > 0 && (
                       <div className="flex flex-wrap gap-1 mb-3">
                         {decodeCheckResults(tx.checkResults)
@@ -294,12 +286,6 @@ export default function PendingTransactionsPage() {
                               ✓ {check.label}
                             </span>
                           ))}
-                      </div>
-                    )}
-
-                    {tx.data && tx.data !== "0x" && (
-                      <div className="text-xs text-[var(--text-secondary)] font-mono truncate max-w-md">
-                        Data: {tx.data.slice(0, 20)}...
                       </div>
                     )}
                   </div>

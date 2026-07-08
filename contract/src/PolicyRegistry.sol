@@ -119,6 +119,7 @@ contract PolicyRegistry is Initializable {
         return _addPolicyInternal(_name, _conditions, _limits, _signers, _riskWeight);
     }
 
+    // NEW: Add multiple preset policies at once
     function addPresetPolicies(
         uint256[] calldata _presetIds,
         address[] calldata _signers,
@@ -132,6 +133,7 @@ contract PolicyRegistry is Initializable {
         return addedIds;
     }
 
+    // NEW: Add single preset policy
     function _addPresetPolicy(
         address _registry,
         uint256 _presetId,

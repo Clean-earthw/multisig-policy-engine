@@ -51,27 +51,35 @@ contract WalletFactory {
         presetPolicyRegistry = _presetPolicyRegistry;
     }
 
+    // NEW: Create wallet with preset policies
     function createWallet(
         address[] calldata _signers,
         uint256[] calldata _presetPolicyIds
     ) external returns (WalletDeployment memory) {
         require(_signers.length > 0, "Need signers");
 
+        // Clone all contracts
         address govProxy = Clones.clone(governanceSingleton);
         address policyRegProxy = Clones.clone(policyRegistrySingleton);
         address auditProxy = Clones.clone(auditLogSingleton);
 
+        // Initialize governance
         GovernanceMultisig gov = GovernanceMultisig(govProxy);
-        PolicyRegistry policyReg = PolicyRegistry(policyRegProxy);
-        AuditLog audit = AuditLog(auditProxy);
-
         gov.initialize(_signers);
+
+        // Initialize policy registry
+        PolicyRegistry policyReg = PolicyRegistry(policyRegProxy);
         policyReg.initialize(govProxy);
 
+        // Initialize audit log
+        AuditLog audit = AuditLog(auditProxy);
+
+        // Deploy wallet
         address walletProxy = Clones.clone(walletSingleton);
         MultisigWallet wallet = MultisigWallet(payable(walletProxy));
         wallet.initialize(auditProxy, teeExtensionRegistry, govProxy);
 
+        // Add preset policies if provided
         if (_presetPolicyIds.length > 0) {
             policyReg.addPresetPolicies(_presetPolicyIds, _signers, presetPolicyRegistry);
         }
@@ -87,11 +95,19 @@ contract WalletFactory {
         creatorWallets[msg.sender].push(deployment);
         creatorWalletCount[msg.sender]++;
 
-        emit WalletCreated(msg.sender, walletProxy, govProxy, policyRegProxy, auditProxy, _signers);
+        emit WalletCreated(
+            msg.sender,
+            walletProxy,
+            govProxy,
+            policyRegProxy,
+            auditProxy,
+            _signers
+        );
 
         return deployment;
     }
 
+    // NEW: Create wallet without presets
     function createWalletNoPresets(
         address[] calldata _signers
     ) external returns (WalletDeployment memory) {
